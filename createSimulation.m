@@ -3,7 +3,7 @@ function [ output ] = createSimulation( I )
 %   input is a structure that has the fields
 %   - A: activity matrix [-]
 %   - speed: speed of vehicles [km/h]
-%   - periodLength: poisson period intensities [minutes]
+%   - periodLength: period lenghts [minutes]
 %   - poissonPeriodIntensities: poisson period intensities [requests / minute]
 %   - pickupDuration: pickup duration [seconds]
 %   - deliveryDuration: delivery duration [seconds]
