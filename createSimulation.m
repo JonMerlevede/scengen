@@ -93,7 +93,9 @@ function [ output ] = createSimulation( I )
         % Latest feasible time to start a pickup
         lftPickup = lftDelivery - mttBetween - I.pickupDuration;
         if lftPickup <= cT
-            cdisp('Dismissing package: infeasible packet')
+            if verbose
+                show('Dismissing package: infeasible packet')
+            end
             continue; % call is not accepted
         end
 
@@ -131,7 +133,9 @@ function [ output ] = createSimulation( I )
 
         %% Discard calls
         if (ptwEnd < requestArrivalTime + minimumSeparation)
-            cdisp('Dismissing package: minimum separation not met\n');
+            if verbose
+                show('Dismissing package: minimum separation not met\n');
+            end
             continue;
         end
 
@@ -147,12 +151,6 @@ function [ output ] = createSimulation( I )
     end
     % Reduce size of output matrix
     output = output(:,1:nValidRequests);
-    
-    function cdisp (string)
-        if verbose
-            show(string);
-        end
-    end
 end
 
 function validateInput(I)

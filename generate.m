@@ -60,11 +60,12 @@ input.pickupDeltas = [0.1 ; 0.8];
 input.deliveryDeltas = [0.3 ; 1.0];
 
 %%
+nSolutions = 10;
 tic
-for k=1:1
+for k=1:nSolutions
     output = createSimulation(input);
     %fprintf('Generated %d packets.\n',length(output))
-    dlmwrite(sprintf('req_rapide_%d_240_24',k),output.',' ')
+    dlmwrite(sprintf('output/req_rapide_%d_240_24',k),output.',' ')
 end
 toc
-disp('Created 10 solutions.')
+fprintf('Created %d solutions.\n',nSolutions)
