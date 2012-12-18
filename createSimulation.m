@@ -7,6 +7,8 @@ function [ output ] = createSimulation( I )
 %   - poissonPeriodIntensities: poisson period intensities [requests / minute]
 %   - pickupDuration: pickup duration [seconds]
 %   - deliveryDuration: delivery duration [seconds]
+%   - maxWidth: maximum X coordinate value [km]
+%   - maxHeight: maximum Y coordinate value [km]
 %   
 %   Optional fields:
 %   - minimumSeparation: minimum time between packet announce time and the
@@ -31,8 +33,11 @@ function [ output ] = createSimulation( I )
     % time window [seconds]
     if isfield(I, 'minimumSeparation'), minimumSeparation = I.minimumSeparation;
     else minimumSeparation = 0; end
-    % Width and height of the area [km]
+    % Width and height of the matrix A [km]
     [ah aw] = size(I.A);
+    % Proportion between widh and height of A and maximum width and height [-]
+    ph = I.maxHeight/ah; pw = I.maxWidth/aw;
+    props = [pw;ph;pw;ph];
     
 
     %% Process the activity matrix
@@ -76,6 +81,16 @@ function [ output ] = createSimulation( I )
         iPos = min([find(PP > rand,1) length(PP)]);
         [ppY ppX dpY dpX] = ind2sub([ah aw ah aw],iPos); % square position
         pos = [ppX;ppY;dpX;dpY] - ones(4,1) + rand(4,1); % uniform random position within square
+        pos = pos .* props;
+        % It is possible for the positions to be slightly greater than maxHeight
+        % and maxWidth, even though we 1) take array indices, 2) substract one, 
+        % 3) add a random number smaller than one and 4) multiply with the ratio
+        % of maxHeight / maxWidth versus and the width / height of the matrix.
+        % I guess this is due to small rounding errors...
+        pos = [min(pos(1),I.maxHeight), ...
+            min(pos(2),I.maxWidth), ...
+            min(pos(3),I.maxHeight), ...
+            min(pos(4),I.maxWidth)];
         pP = pos(1:2); % pickup point
         dP = pos(3:4); % delivery point
         

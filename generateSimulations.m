@@ -11,6 +11,25 @@
 % * |deliveryY = Double.parseDouble(parts[8])|
 % * |deliveryTimeWindowBegin = (long) (Double.parseDouble(parts[9]) * 1000.0)|
 % * |deliveryTimeWindowEnd = (long) (Double.parseDouble(parts[10]) * 1000.0)|
+%% Set random seet
+%stream = RandStream('mt19937ar','Seed',1990);
+%RandStream.setGlobalStream(stream)
+seed = 1990;
+if exist('OCTAVE_VERSION','builtin')
+    rand('state',seed);  % Octave
+    randn('state',seed); % Octave
+else
+    try
+         RandStream.setGlobalStream(RandStream('mt19937ar','seed',seed));
+    catch e1
+        try
+            % matlab 7.9+
+            RandStream.setDefaultStream(RandStream('mt19937ar','seed',seed));
+        catch e2
+            randn('state',seed); % Matlab 5+
+        end
+    end
+end
 
 %%Fixed parameters
 % These parameters are currently set as described in section 6.1 of
@@ -39,7 +58,6 @@ input.minimumSeparation = 30*60;% Minimum time between announce and latest picku
 % A = ones(aw,ah); % uniform activity matrix.
  A = [1 1 2 3  2
       1 6 6 6  6
-      2 6 9 9  9
       3 6 9 13 9
       2 6 9 9  9]; % matrix like described
 % A = [0 0 0 0 0
@@ -59,6 +77,8 @@ input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
 % Delta values
 input.pickupDeltas = [0.1 ; 0.8];
 input.deliveryDeltas = [0.3 ; 1.0];
+input.maxWidth = 5;
+input.maxHeight = 5;
 
 %%
 nSolutions = 100;
@@ -66,7 +86,7 @@ tic
 for k=1:nSolutions
     output = createSimulation(input);
     %fprintf('Generated %d packets.\n',length(output))
-    dlmwrite(sprintf('output/req_rapide_%d_240_24',k),output.',' ')
+    dlmwrite(sprintf('output/req_rapide_%d_240_24',k),output.','delimiter',' ','precision',10)
 end
 toc
 fprintf('Created %d solutions.\n',nSolutions)

@@ -1,8 +1,8 @@
 generateSimulations
-A33 = reverseA(readData('existing','req*33'));
-A24 = reverseA(readData('existing','req*24'));
-AT = reverseA(readData('existing','req*'));
-myA = reverseA(readData('output','req*'));
+A33 = reverseA(readData('existing','req*33'),1,4/5);
+A24 = reverseA(readData('existing','req*24'),1,4/5);
+AT = reverseA(readData('existing','req*'),1,4/5);
+myA = reverseA(readData('output','req*'),1,4/5);
 
 figure(1)
 subplot(1,2,1)
