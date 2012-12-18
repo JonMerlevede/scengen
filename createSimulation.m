@@ -87,9 +87,9 @@ function [ output ] = createSimulation( I )
         % 3) add a random number smaller than one and 4) multiply with the ratio
         % of maxHeight / maxWidth versus and the width / height of the matrix.
         % I guess this is due to small rounding errors...
-        pos = [min(pos(1),I.maxHeight), ...
-            min(pos(2),I.maxWidth), ...
-            min(pos(3),I.maxHeight), ...
+        pos = [min(pos(1),I.maxHeight)
+            min(pos(2),I.maxWidth)
+            min(pos(3),I.maxHeight)
             min(pos(4),I.maxWidth)];
         pP = pos(1:2); % pickup point
         dP = pos(3:4); % delivery point
@@ -100,13 +100,17 @@ function [ output ] = createSimulation( I )
         % ARRIVAL TIME.
         cT = requestArrivalTime; % current time
         % Minimum travel time after delivery in seconds
-        mttDelivery = norm(dP)/speed;
+        mttDelivery = norm(dP-[2.5;2.5])/speed;
         % Minimum travel time between pickup and delivery in seconds
         mttBetween = norm(dP-pP)/speed;
-        % Latest feasible time to start a delivery
-        lftDelivery = totalSimulationTime - mttDelivery - I.deliveryDuration;
-        % Latest feasible time to start a pickup
-        lftPickup = lftDelivery - mttBetween - I.pickupDuration;
+        % Latest feasible time to start a delivery (really)
+        % lftDelivery = totalSimulationTime - mttDelivery - I.deliveryDuration;
+        % Latest feasible time to start a delivery (Gendreau)
+        lftDelivery = totalSimulationTime - mttDelivery;
+        % Latest feasible time to start a pickup (really)
+        % lftPickup = lftDelivery - mttBetween - I.pickupDuration;
+        % Latest feasible time to start a pickup (Gendreau)
+        lftPickup = totalSimulationTime - mttBetween - mttDelivery;
         if lftPickup <= cT
             if verbose
                 show('Dismissing package: infeasible packet')
@@ -127,12 +131,14 @@ function [ output ] = createSimulation( I )
         end
         remainingTime = lftPickup - (ptwBegin + I.pickupDuration);
         remainingTimeFraction = I.pickupDeltas(1) + diff(I.pickupDeltas)*rand;
-        ptwEnd = ptwBegin + I.pickupDuration + remainingTime*remainingTimeFraction;
+        ptwEnd = ptwBegin + remainingTime*remainingTimeFraction;
 
         %% Determine dropoff time window
 
-        % Earliest time we can start pickup
-        earliestPossible = ptwBegin + I.pickupDuration + mttBetween;
+        % Earliest time we can start delivery (really)
+        % earliestPossible = ptwBegin + I.pickupDuration + mttBetween;
+        % Earliest time we can start delivery (by Gendreau)
+        earliestPossible = ptwBegin + mttBetween;
         % Determine halftime for delivery
         ht = (earliestPossible + lftDelivery) / 2;
         % Determine random delivery beta value
@@ -144,7 +150,7 @@ function [ output ] = createSimulation( I )
         end
         remainingTime = lftDelivery - (dtwBegin + I.deliveryDuration);
         remainingTimeFraction = I.deliveryDeltas(1) + diff(I.deliveryDeltas)*rand;
-        dtwEnd = dtwBegin + I.deliveryDuration + remainingTime*remainingTimeFraction;
+        dtwEnd = dtwBegin + remainingTime*remainingTimeFraction;
 
         %% Discard calls
         if (ptwEnd < requestArrivalTime + minimumSeparation)

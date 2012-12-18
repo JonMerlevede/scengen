@@ -81,7 +81,7 @@ input.maxWidth = 5;
 input.maxHeight = 5;
 
 %%
-nSolutions = 100;
+nSolutions = 15;
 tic
 for k=1:nSolutions
     output = createSimulation(input);
