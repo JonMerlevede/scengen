@@ -1,4 +1,4 @@
-generateSimulations
+%generateSimulations
 A33 = reverseA(readData('existing','req*33'),1,4/5);
 A24 = reverseA(readData('existing','req*24'),1,4/5);
 AT = reverseA(readData('existing','req*'),1,4/5);

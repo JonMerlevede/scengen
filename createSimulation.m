@@ -29,6 +29,8 @@ function [ output ] = createSimulation( I )
     periodStartTimes = cumsum(I.periodLength)-I.periodLength;
     % Speed of the vehicles [km/s]
     speed = I.speed/3600;
+    % Depot locations
+    depotLocation =  reshape(I.depotLocation,2,1);
     % Minimum time between packet announce time and the end of the pickup
     % time window [seconds]
     if isfield(I, 'minimumSeparation'), minimumSeparation = I.minimumSeparation;
@@ -100,9 +102,9 @@ function [ output ] = createSimulation( I )
         % ARRIVAL TIME.
         cT = requestArrivalTime; % current time
         % Minimum travel time after delivery in seconds
-        mttDelivery = norm(dP-[2.5;2.5])/speed;
+        mttDelivery = norm(dP - depotLocation)/speed;
         % Minimum travel time between pickup and delivery in seconds
-        mttBetween = norm(dP-pP)/speed;
+        mttBetween = norm(dP - pP)/speed;
         % Latest feasible time to start a delivery (really)
         % lftDelivery = totalSimulationTime - mttDelivery - I.deliveryDuration;
         % Latest feasible time to start a delivery (Gendreau)
@@ -183,7 +185,8 @@ function validateInput(I)
         'periodLength'
         'poissonPeriodIntensities'
         'pickupDeltas'
-        'deliveryDeltas'};
+        'deliveryDeltas'
+        'depotLocation'};
     for k=1:length(requiredFields)
         assert(...
             isfield(I,requiredFields{k}), ...
@@ -195,6 +198,8 @@ function validateInput(I)
         'pickupDeltas has to have length 2')
     assert(length(I.deliveryDeltas) == 2, ...
         'deliveryDeltas has to have length 2')
+    assert(length(I.depotLocation) == 2,...
+        'depotLocation has to have length 2')
     assert(I.speed > 0,...
         'speed needs to be strictly positive')
     assert(all(I.poissonPeriodIntensities >= 0), ...

@@ -53,27 +53,26 @@ aw = 5;% Width of the area in km
 ah = 5;% Height of the area in km
 input.pickupDuration = 5*60;% Pickup service time in seconds
 input.deliveryDuration = 5*60;% Delivery service time in seconds
-totalSimulationTime = 4*60*60;% Total simulation length in seconds
 input.minimumSeparation = 30*60;% Minimum time between announce and latest pickup in seconds
+input.depotLocation = [2.5;2.5];
 % A = ones(aw,ah); % uniform activity matrix.
- A = [1 1 2 3  2
-      1 6 6 6  6
-      3 6 9 13 9
-      2 6 9 9  9]; % matrix like described
+%  A = [1 1 2 3  2
+%       1 6 6 6  6
+%       3 6 9 13 9
+%       2 6 9 9  9]; % matrix like described
 % A = [0 0 0 0 0
 %      0 0 0 0 0
 %      0 1 0 0 0
 %      0 0 0 0 0
 %      0 0 0 0 1]; % matrix to test
 % Normalize matrix
-A = A * (1/sum(A(:)));
+%A = A * (1/sum(A(:)));
+A = reverseA(readData('existing','req*'),1,4/5);
 input.A = A;
 % Period lengths in minutes.
-periodLength = [1 1 .5 1 1 ].';
-input.periodLength = periodLength/sum(periodLength)*(totalSimulationTime/60);
+
 % Poisson intensity parameters specified in requests / minute.
-% input.poissonPeriodIntensities = [0.75 1.10 0.25 0.40 0.10].'; % 33 / minute
-input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
+
 % Delta values
 input.pickupDeltas = [0.1 ; 0.8];
 input.deliveryDeltas = [0.3 ; 1.0];
@@ -81,12 +80,45 @@ input.maxWidth = 5;
 input.maxHeight = 5;
 
 %%
-nSolutions = 15;
+nSolutions = 500;
+totalSimulationTime = 4*60*60;% Total simulation length in seconds
+periodLength = [1 1 .5 1 1 ].';
+input.periodLength = periodLength/sum(periodLength)*(totalSimulationTime/60);
+input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
 tic
 for k=1:nSolutions
     output = createSimulation(input);
-    %fprintf('Generated %d packets.\n',length(output))
-    dlmwrite(sprintf('output/req_rapide_%d_240_24',k),output.','delimiter',' ','precision',10)
+    dlmwrite(sprintf('output/train_req_rapide_%d_240_24',k),output.','delimiter',' ','precision',10)
+end
+for k=1:nSolutions
+    output = createSimulation(input);
+    dlmwrite(sprintf('output/test_req_rapide_%d_240_24',k),output.','delimiter',' ','precision',10)
 end
 toc
-fprintf('Created %d solutions.\n',nSolutions)
+input.poissonPeriodIntensities = [0.75 1.10 0.25 0.40 0.10].'; % 33 / minute
+tic
+for k=1:nSolutions
+    output = createSimulation(input);
+    dlmwrite(sprintf('output/train_req_rapide_%d_240_33',k),output.','delimiter',' ','precision',10)
+end
+for k=1:nSolutions
+    output = createSimulation(input);
+    dlmwrite(sprintf('output/test_req_rapide_%d_240_33',k),output.','delimiter',' ','precision',10)
+end
+toc
+totalSimulationTime = 7.5*60*60;% Total simulation length in seconds
+periodLength = [1 1 .5 1 1 ].';
+input.periodLength = periodLength/sum(periodLength)*(totalSimulationTime/60);
+input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
+tic
+for k=1:nSolutions
+    output = createSimulation(input);
+    dlmwrite(sprintf('output/train_req_rapide_%d_450_24',k),output.','delimiter',' ','precision',10)
+end
+for k=1:nSolutions
+    output = createSimulation(input);
+    dlmwrite(sprintf('output/test_req_rapide_%d_450_24',k),output.','delimiter',' ','precision',10)
+end
+toc
+
+fprintf('Created 6x%d solutions.\n',nSolutions)
