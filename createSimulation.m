@@ -28,7 +28,7 @@ function [ output ] = createSimulation( I )
     % Period start times [seconds]
     periodStartTimes = cumsum(I.periodLength)-I.periodLength;
     % Speed of the vehicles [km/s]
-    speed = I.speed/60/60;
+    speed = I.speed/3600;
     % Minimum time between packet announce time and the end of the pickup
     % time window [seconds]
     if isfield(I, 'minimumSeparation'), minimumSeparation = I.minimumSeparation;
