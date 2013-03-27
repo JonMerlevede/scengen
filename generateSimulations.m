@@ -1,5 +1,11 @@
-%% In  Java we interpret the output file like this
+% Number of solution to generate in each category
+% (1) - short/easy, (2) - short/hard, (3) - long/easy, (4) - long/hard.
+NUMBER_OF_SOLUTIONS = repmat(10,4,1);
+OUTPUT_FOLDER = 'output';
+
+%% Goal
 %
+% In  Java we interpret the output file like this
 % * |requestArrivalTime = (long) (Double.parseDouble(parts[0]) * 1000.0)|
 % * |pickupServiceTime = Long.parseLong(parts[1]) * 1000|
 % * |pickupX = Double.parseDouble(parts[2])|
@@ -11,16 +17,21 @@
 % * |deliveryY = Double.parseDouble(parts[8])|
 % * |deliveryTimeWindowBegin = (long) (Double.parseDouble(parts[9]) * 1000.0)|
 % * |deliveryTimeWindowEnd = (long) (Double.parseDouble(parts[10]) * 1000.0)|
-%% Set random seet
+
+%% Set random seed
 %stream = RandStream('mt19937ar','Seed',1990);
 %RandStream.setGlobalStream(stream)
 seed = 1990;
+% If we're working with Octave
 if exist('OCTAVE_VERSION','builtin')
     rand('state',seed);  % Octave
     randn('state',seed); % Octave
+% If we're not working with Ocate (i.e. we're working with MATLAB)
 else
+    % If we are working with an old version of MATLAB
     try
          RandStream.setGlobalStream(RandStream('mt19937ar','seed',seed));
+    % If we are working with an old version of MATLAB
     catch e1
         try
             % matlab 7.9+
@@ -31,30 +42,133 @@ else
     end
 end
 
-%%Fixed parameters
-% These parameters are currently set as described in section 6.1 of
-% Gendreau's article.
+%% Set fixed simulation parameters
+% These parameters are set as described in section 6.1 of Gendreau'
+% article.
 %
-% For the poisson intensity parameters we have
-%
-% # Set that corresponds to an average of 33 requests / hour
-% # Set that corresponds to an average of 24 requests / hour
-%
-% Remarks:
-%
-% # In the description of 5.1 it seems as if $$A$ should really be
-% dependent of time and therefore be denoted $$A^l$. A zone $$p$
-% corresponds to a position, which is a tuple $$(i,j)$. In the simulation
-% we assume that $$A$ is not dependent of time (see section 6.1 in the
-% paper).
-% Speed in km/s
-input.speed = 30;     
-aw = 5;% Width of the area in km
-ah = 5;% Height of the area in km
-input.pickupDuration = 5*60;% Pickup service time in seconds
-input.deliveryDuration = 5*60;% Delivery service time in seconds
-input.minimumSeparation = 30*60;% Minimum time between announce and latest pickup in seconds
-input.depotLocation = [2.5;2.5];
+% Width of the area [km]
+    input.maxWidth = 5;
+% Height of the area [km]
+    input.maxHeight = 5;
+% Speed of the vehicles [km/h]
+    input.speed = 30;
+% Pickup service time [seconds]
+    input.pickupDuration = 5*60;
+% Delivery service time [seconds]
+    input.deliveryDuration = 5*60;
+% Minimum time between announce and latest pickup [seconds]
+    input.minimumSeparation = 30*60;
+% (x,y) location of the central depot [km]
+    input.depotLocation = [2;2.5];
+% Activity matrix - reverse-engineer from existing scenarios [-]
+    input.A = reverseA(readData('existing','req*'),1,4/5);
+% Delta values for generating pickup time windows [-]
+    input.pickupDeltas = [0.1 ; 0.8];
+% Delta values for generating delivery time windows [-]
+    input.deliveryDeltas = [0.3 ; 1.0];
+
+%% Generate full descriptions for four sets of scenarios
+% scenarioDescriptions{1} Short, easy set (4 hours, 24 requests / hour)
+% scenarioDescriptions{2} Short, hard set (4 hours, 33 requests / hour)
+% scenarioDescriptions{3} Long, easy set (7.5 hours, 24 requests / hour)
+% scenarioDescriptions{4} Long, hard set (7.5 hours, 33 requests / hour)
+ relativePeriodLength = [1 1 .5 1 1 ].';
+% Period matrix for the short scenarios [minutes]
+    totalSimulationTime = 4*60*60; % Simulation length of 4 hours [seconds]
+    shortPeriod = relativePeriodLength/sum(relativePeriodLength)*(totalSimulationTime/60);
+% Period matrix for the long scenarios [minutes]
+    totalSimulationTime = 7.5*60*60; % Simulation length of 7.5 hours [seconds]
+    longPeriod = relativePeriodLength/sum(relativePeriodLength)*(totalSimulationTime/60);
+% Poisson intensity matrix for easy scenarios (24 requests / hour) [requests/minute]
+    easyPoisson = [0.55 0.70 0.10 0.40 0.10].';
+% Poisson intensity matrix for hard scenarios (33 requests / hour) [requests/minute]
+    hardPoisson = [0.75 1.10 0.25 0.40 0.10].';
+
+t = input;
+% SET 1-2) Short
+t.periodLength = shortPeriod;
+    % SET 1) Short, easy (24 requests / hour)
+    t.poissonPeriodIntensities = easyPoisson;
+    t.suffix = '240_24';
+    scenarioDescriptions{1} = t;
+    % SET 2) Short, hard (33 requests / hour)
+    t.poissonPeriodIntensities = hardPoisson;
+    t.suffix = '240_33';
+    scenarioDescriptions{2} = t;
+% Set 3-4) Long
+t.periodLength = longPeriod;
+    % SET 3) Long, easy (24 requests / hour)
+    t.poissonPeriodIntensities = easyPoisson;
+    t.suffix = '450_24';
+    scenarioDescriptions{3} = t;
+    % SET 4) Long, hard (33 requests / hour)
+    t.poissonPeriodIntensities = hardPoisson;
+    t.suffix = '450_33';
+    scenarioDescriptions{4} = t;
+
+%% Generate the scenario files
+for k=1:4
+   tic
+   for n=1:NUMBER_OF_SOLUTIONS(k)
+       output = createSimulation(scenarioDescriptions{k});
+       path = sprintf(...
+           '%s/train_req_rapide_%03d_%s',...
+           OUTPUT_FOLDER,n,scenarioDescriptions{k}.suffix);
+       dlmwrite(path, output.','delimiter',' ','precision',10);
+   end
+   toc
+end
+
+
+% tic
+% for k=1:NUMBER_OF_SOLUTIONS
+%     output = createSimulation(input);
+%     dlmwrite(...
+%         sprintf('output/train_req_rapide_%03d_240_24',k),...
+%         output.','delimiter',' ','precision',10)
+% end
+% for k=1:NUMBER_OF_SOLUTIONS
+%     output = createSimulation(input);
+%     dlmwrite(...
+%         sprintf('output/test_req_rapide_%03d_240_24',k),...
+%         output.','delimiter',' ','precision',10)
+% end
+% toc
+% input.poissonPeriodIntensities = 
+% tic
+% for k=1:NUMBER_OF_SOLUTIONS
+%     output = createSimulation(input);
+%     dlmwrite(...
+%         sprintf('output/train_req_rapide_%03d_240_33',k),...
+%         output.','delimiter',' ','precision',10)
+% end
+% for k=1:NUMBER_OF_SOLUTIONS
+%     output = createSimulation(input);
+%     dlmwrite(...
+%         sprintf('output/test_req_rapide_%03d_240_33',k),...
+%         output.','delimiter',' ','precision',10)
+% end
+% toc
+% totalSimulationTime = 7.5*60*60;% Total simulation length in seconds
+% periodLength = [1 1 .5 1 1 ].';
+% input.periodLength = periodLength/sum(periodLength)*(totalSimulationTime/60);
+% input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
+% tic
+% for k=1:NUMBER_OF_SOLUTIONS
+%     output = createSimulation(input);
+%     dlmwrite(...
+%         sprintf('output/train_req_rapide_%03d_450_24',k),...
+%         output.','delimiter',' ','precision',10)
+% end
+% for k=1:NUMBER_OF_SOLUTIONS
+%     output = createSimulation(input);
+%     dlmwrite(...
+%         sprintf('output/test_req_rapide_%03d_450_24',k),...
+%         output.','delimiter',' ','precision',10)
+% end
+% toc
+
+%% Other activity matrices to experiment with
 % A = ones(aw,ah); % uniform activity matrix.
 %  A = [1 1 2 3  2
 %       1 6 6 6  6
@@ -67,58 +181,5 @@ input.depotLocation = [2.5;2.5];
 %      0 0 0 0 1]; % matrix to test
 % Normalize matrix
 %A = A * (1/sum(A(:)));
-A = reverseA(readData('existing','req*'),1,4/5);
-input.A = A;
-% Period lengths in minutes.
 
-% Poisson intensity parameters specified in requests / minute.
-
-% Delta values
-input.pickupDeltas = [0.1 ; 0.8];
-input.deliveryDeltas = [0.3 ; 1.0];
-input.maxWidth = 5;
-input.maxHeight = 5;
-
-%%
-nSolutions = 500;
-totalSimulationTime = 4*60*60;% Total simulation length in seconds
-periodLength = [1 1 .5 1 1 ].';
-input.periodLength = periodLength/sum(periodLength)*(totalSimulationTime/60);
-input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
-tic
-for k=1:nSolutions
-    output = createSimulation(input);
-    dlmwrite(sprintf('output/train_req_rapide_%d_240_24',k),output.','delimiter',' ','precision',10)
-end
-for k=1:nSolutions
-    output = createSimulation(input);
-    dlmwrite(sprintf('output/test_req_rapide_%d_240_24',k),output.','delimiter',' ','precision',10)
-end
-toc
-input.poissonPeriodIntensities = [0.75 1.10 0.25 0.40 0.10].'; % 33 / minute
-tic
-for k=1:nSolutions
-    output = createSimulation(input);
-    dlmwrite(sprintf('output/train_req_rapide_%d_240_33',k),output.','delimiter',' ','precision',10)
-end
-for k=1:nSolutions
-    output = createSimulation(input);
-    dlmwrite(sprintf('output/test_req_rapide_%d_240_33',k),output.','delimiter',' ','precision',10)
-end
-toc
-totalSimulationTime = 7.5*60*60;% Total simulation length in seconds
-periodLength = [1 1 .5 1 1 ].';
-input.periodLength = periodLength/sum(periodLength)*(totalSimulationTime/60);
-input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
-tic
-for k=1:nSolutions
-    output = createSimulation(input);
-    dlmwrite(sprintf('output/train_req_rapide_%d_450_24',k),output.','delimiter',' ','precision',10)
-end
-for k=1:nSolutions
-    output = createSimulation(input);
-    dlmwrite(sprintf('output/test_req_rapide_%d_450_24',k),output.','delimiter',' ','precision',10)
-end
-toc
-
-fprintf('Created 6x%d solutions.\n',nSolutions)
+fprintf('Created 6x%d solutions.\n',NUMBER_OF_SOLUTIONS)

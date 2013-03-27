@@ -2,7 +2,7 @@ function A = reverseA(D, xStretch, yStretch )
 %DETERMINEA Returns the best estimation of the activation matrix A used for
 %           generating D.
 %
-%   D should be a cell array as retured by readData.
+%   D is a cell array containing simulation data as retured by readData.
 %   If the biggest x- and y-coordinates are not present in the data, the
 %   activation matrix will be too small.
     if (nargin < 1)
@@ -14,8 +14,13 @@ function A = reverseA(D, xStretch, yStretch )
         yStretch = 1;
     end
     define_Cn
-    
+    % Define BD as the matrix containing the data of the simulations.
+    %   BD has a row for each property of a transportation request
+    %   BD has a column for each transportation request in any simulation
+    %       (MATLAB concatenates results by adding columns)
     BD = [D{:,2}];
+    % Reduce BD so that it only contains the relevant data - the locations
+    % of pickups and deliveries.
     BD = BD([cN.pickupX cN.pickupY cN.deliveryX cN.deliveryY],:);
     BD([1 3],:) = floor(BD([1 3],:)*xStretch);
     BD([2 4],:) = floor(BD([2 4],:)*yStretch);
