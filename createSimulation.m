@@ -9,10 +9,10 @@ function [ output ] = createSimulation( I )
 %   - deliveryDuration: delivery duration [seconds]
 %   - maxWidth: maximum X coordinate value [km]
 %   - maxHeight: maximum Y coordinate value [km]
-%   
-%   Optional fields:
 %   - minimumSeparation: minimum time between packet announce time and the
 %     end of the pickup time window [seconds]
+%   
+%   Optional fields:
 %   - verbose: if present, script is more verbose
     
     %% Validate input
@@ -20,24 +20,24 @@ function [ output ] = createSimulation( I )
 
     %% Process input
     % Verbosity
-    verbose = isfield(I,'verbose');
-    % Number of (discrete) time periods
+    if (isfield(I,'verbose'))
+        verbose = I.verbose;
+    else
+        verbose = false;
+    end
+    % Number of (discrete) time periods [-]
     nPeriods = length(I.periodLength);
     % Total simulation time [seconds]
     totalSimulationTime = sum(I.periodLength)*60;
-    % Period start times [seconds]
+    % Period start times [minutes]
     periodStartTimes = cumsum(I.periodLength)-I.periodLength;
     % Speed of the vehicles [km/s]
     speed = I.speed/3600;
-    % Depot locations
+    % Depot locations [km]
     depotLocation =  reshape(I.depotLocation,2,1);
-    % Minimum time between packet announce time and the end of the pickup
-    % time window [seconds]
-    if isfield(I, 'minimumSeparation'), minimumSeparation = I.minimumSeparation;
-    else minimumSeparation = 0; end
     % Width and height of the matrix A [km]
-    [ah aw] = size(I.A);
-    % Proportion between widh and height of A and maximum width and height [-]
+    [ah,aw] = size(I.A);
+    % Proportion between width and height of A and maximum width and height [-]
     ph = I.maxHeight/ah; pw = I.maxWidth/aw;
     props = [pw;ph;pw;ph];
     
@@ -48,6 +48,8 @@ function [ output ] = createSimulation( I )
     PP = cumsum(P(:));
     assert(numel(P) == ah*aw*ah*aw);
     assert(P(3,2,1,1) == I.A(3,2) * I.A(1,1));
+    assert(P(3,3,1,3) == I.A(3,3) * I.A(1,3));
+    assert(P(1,1,3,1) == I.A(1,1) * I.A(3,1));
     
     
     %% Determine number of (possible) packets
@@ -55,6 +57,9 @@ function [ output ] = createSimulation( I )
     requestPeriods = zeros(round(sum(I.poissonPeriodIntensities .* I.periodLength)) * 3,1);
     nRequests = 0;
     for l = 1:nPeriods
+        % 'A Poisson law of intensity $$lambda^l$$ is applied to determine
+        % the occurence of the next request => use the poisson intensities
+        % to determine the number of requests in a time slot.
         nRequestsThisPeriod = poissrnd(I.poissonPeriodIntensities(l)*I.periodLength(l));
         newNRequests = nRequests + nRequestsThisPeriod;
         requestPeriods(nRequests + 1:newNRequests) = repmat(l,nRequestsThisPeriod,1);
@@ -67,32 +72,23 @@ function [ output ] = createSimulation( I )
     %% Looping
     for k = 1:nRequests
         period = requestPeriods(k);
-        % Determine packet announce time
-        % THIS MIGHT VERY WELL BE INCORRECT
-        % Page 166 tells us that 'a poisson law of intensity lambda^l is
-        % applied to determine the time of occurence of the next request', but
-        % lambda is expressed in requests / minute and we already use lambda to
-        % determine the number of packages we generate. Also, a Poisson
-        % distribution only produces integer values that are (at least for the
-        % given lambdas) fairly close to zero.
+        % Determine packet announce / request arrival time
+        % Although not explicitly mentioned (?), we assume the request
+        % arrival time to be uniformely distributed within its time slot.
         requestArrivalTime = periodStartTimes(period) + rand*I.periodLength(period);
+        % Transform from [minutes] to [seconds]
         requestArrivalTime = requestArrivalTime*60;
         
         %% Determine packet position
         % Determine position square index
         iPos = min([find(PP > rand,1) length(PP)]);
-        [ppY ppX dpY dpX] = ind2sub([ah aw ah aw],iPos); % square position
+        [ppY,ppX,dpY,dpX] = ind2sub([ah aw ah aw],iPos); % square position
         pos = [ppX;ppY;dpX;dpY] - ones(4,1) + rand(4,1); % uniform random position within square
         pos = pos .* props;
-        % It is possible for the positions to be slightly greater than maxHeight
-        % and maxWidth, even though we 1) take array indices, 2) substract one, 
-        % 3) add a random number smaller than one and 4) multiply with the ratio
-        % of maxHeight / maxWidth versus and the width / height of the matrix.
-        % I guess this is due to small rounding errors...
-        pos = [min(pos(1),I.maxHeight)
-            min(pos(2),I.maxWidth)
-            min(pos(3),I.maxHeight)
-            min(pos(4),I.maxWidth)];
+        assert(pos(1) < I.maxHeight);
+        assert(pos(2) < I.maxWidth);
+        assert(pos(3) < I.maxHeight);
+        assert(pos(4) < I.maxWidth);
         pP = pos(1:2); % pickup point
         dP = pos(3:4); % delivery point
         
@@ -113,12 +109,12 @@ function [ output ] = createSimulation( I )
         % lftPickup = lftDelivery - mttBetween - I.pickupDuration;
         % Latest feasible time to start a pickup (Gendreau)
         lftPickup = totalSimulationTime - mttBetween - mttDelivery;
-        if lftPickup <= cT
-            if verbose
-                show('Dismissing package: infeasible packet')
-            end
-            continue; % call is not accepted
-        end
+%         if cT > lftPickup
+%             if verbose
+%                 disp('Dismissing package: infeasible packet')
+%             end
+%             continue; % call is not accepted
+%         end
 
         %% Deterimine pickup time window
 
@@ -131,11 +127,27 @@ function [ output ] = createSimulation( I )
         else
             ptwBegin = ht + (lftPickup - ht)*rand;
         end
-        remainingTime = lftPickup - (ptwBegin + I.pickupDuration);
+        % The end of the time window at the pick-up location is set to
+        % the beginning of the time window + a fraction of the time
+        % remaining until the end of the day.
+        % Remaining time (actual)
+        % remainingTime = lftPickup - (ptwBegin + I.pickupDuration);
+        % Remaining time (Gendreau) - I added the max here myself
+        remainingTime = max(totalSimulationTime - ptwBegin,0);
         remainingTimeFraction = I.pickupDeltas(1) + diff(I.pickupDeltas)*rand;
         ptwEnd = ptwBegin + remainingTime*remainingTimeFraction;
+        % WHAT TO DO IN THIS CASE IS NOT SPECIFIED
+        % I skip generation of these scenario's (the existing Gendreau
+        % scenario's do not contain scenario's that match this case)
+        if (ptwEnd > lftPickup)
+            if verbose
+                disp('Dismissing package: infeasible packet (pickup TW)')
+            end
+            continue; % call is not accepted
+%             pwtEnd = lftPickup;
+        end
 
-        %% Determine dropoff time window
+        %% Determine delivery time window
 
         % Earliest time we can start delivery (really)
         % earliestPossible = ptwBegin + I.pickupDuration + mttBetween;
@@ -150,14 +162,30 @@ function [ output ] = createSimulation( I )
         else
             dtwBegin = ht + (lftDelivery - ht)*rand;
         end
-        remainingTime = lftDelivery - (dtwBegin + I.deliveryDuration);
+        % The end of the time window at the delivery location is set to
+        % the beginning of the time window + a fraction of the time
+        % remaining until the end of the day.
+        % Remaining time (actual)
+        % remainingTime = lftDelivery - (dtwBegin + I.deliveryDuration);
+        % Remaining time (Gendreau) - I added the max here myself
+        remainingTime = max(totalSimulationTime - dtwBegin,0);
         remainingTimeFraction = I.deliveryDeltas(1) + diff(I.deliveryDeltas)*rand;
         dtwEnd = dtwBegin + remainingTime*remainingTimeFraction;
+        % WHAT TO DO IN THIS CASE IS NOT SPECIFIED
+        % I skip generation of these scenario's (the existing Gendreau
+        % scenario's do not contain scenario's that match this case)
+        if (dtwEnd > lftDelivery)
+            if verbose
+                disp('Dismissing package: infeasible packet (delivery TW)')
+            end
+%             dwtEnd = lftDelivery;
+            continue; % call is not accepted
+        end
 
         %% Discard calls
-        if (ptwEnd < requestArrivalTime + minimumSeparation)
+        if (ptwEnd < requestArrivalTime + I.minimumSeparation)
             if verbose
-                show('Dismissing package: minimum separation not met\n');
+                disp('Dismissing package: minimum separation not met');
             end
             continue;
         end
@@ -183,6 +211,7 @@ function validateInput(I)
         'pickupDuration'
         'deliveryDuration'
         'periodLength'
+        'minimumSeparation'
         'poissonPeriodIntensities'
         'pickupDeltas'
         'deliveryDeltas'

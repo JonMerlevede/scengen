@@ -1,6 +1,8 @@
 % Number of solution to generate in each category
-% (1) - short/easy, (2) - short/hard, (3) - long/easy, (4) - long/hard.
-NUMBER_OF_SOLUTIONS = repmat(10,4,1);
+% (:,1) - short/easy, (:,2) - short/hard, (:,3) - long/easy, (:,4) - long/hard.
+% (1,:) - training scenarios - (2,:) - test scenarios
+NUMBER_OF_SOLUTIONS = [100 100 100 0
+    50 50 50 0];
 OUTPUT_FOLDER = 'output';
 
 %% Goal
@@ -58,15 +60,19 @@ end
     input.deliveryDuration = 5*60;
 % Minimum time between announce and latest pickup [seconds]
     input.minimumSeparation = 30*60;
-% (x,y) location of the central depot [km]
+% (horizontal,vertical) aka (x,y) location of the central depot [km]
     input.depotLocation = [2;2.5];
 % Activity matrix - reverse-engineer from existing scenarios [-]
-    input.A = reverseA(readData('existing','req*'),1,4/5);
-% Delta values for generating pickup time windows [-]
+    hZones = 5; % number of horizontal zones
+    vZones = 4; % number of vertical zones
+    input.A = reverseA(readData('existing','req*'),hZones,vZones);
+% Boundaries of uniform distribution to draw delta values for generating pickup time windows [-]
     input.pickupDeltas = [0.1 ; 0.8];
-% Delta values for generating delivery time windows [-]
+% Bouddaries of uniform distribution to draw delta values for generating delivery time windows [-]
     input.deliveryDeltas = [0.3 ; 1.0];
-
+% Verbosity
+    input.verbose = false;
+    
 %% Generate full descriptions for four sets of scenarios
 % scenarioDescriptions{1} Short, easy set (4 hours, 24 requests / hour)
 % scenarioDescriptions{2} Short, hard set (4 hours, 33 requests / hour)
@@ -109,64 +115,22 @@ t.periodLength = longPeriod;
 %% Generate the scenario files
 for k=1:4
    tic
-   for n=1:NUMBER_OF_SOLUTIONS(k)
+   for n=1:NUMBER_OF_SOLUTIONS(1,k)
        output = createSimulation(scenarioDescriptions{k});
        path = sprintf(...
            '%s/train_req_rapide_%03d_%s',...
            OUTPUT_FOLDER,n,scenarioDescriptions{k}.suffix);
        dlmwrite(path, output.','delimiter',' ','precision',10);
    end
+   for n=1:NUMBER_OF_SOLUTIONS(2,k)
+       output = createSimulation(scenarioDescriptions{k});
+       path = sprintf(...
+           '%s/test_req_rapide_%03d_%s',...
+           OUTPUT_FOLDER,n,scenarioDescriptions{k}.suffix);
+       dlmwrite(path, output.','delimiter',' ','precision',10);
+   end
    toc
 end
-
-
-% tic
-% for k=1:NUMBER_OF_SOLUTIONS
-%     output = createSimulation(input);
-%     dlmwrite(...
-%         sprintf('output/train_req_rapide_%03d_240_24',k),...
-%         output.','delimiter',' ','precision',10)
-% end
-% for k=1:NUMBER_OF_SOLUTIONS
-%     output = createSimulation(input);
-%     dlmwrite(...
-%         sprintf('output/test_req_rapide_%03d_240_24',k),...
-%         output.','delimiter',' ','precision',10)
-% end
-% toc
-% input.poissonPeriodIntensities = 
-% tic
-% for k=1:NUMBER_OF_SOLUTIONS
-%     output = createSimulation(input);
-%     dlmwrite(...
-%         sprintf('output/train_req_rapide_%03d_240_33',k),...
-%         output.','delimiter',' ','precision',10)
-% end
-% for k=1:NUMBER_OF_SOLUTIONS
-%     output = createSimulation(input);
-%     dlmwrite(...
-%         sprintf('output/test_req_rapide_%03d_240_33',k),...
-%         output.','delimiter',' ','precision',10)
-% end
-% toc
-% totalSimulationTime = 7.5*60*60;% Total simulation length in seconds
-% periodLength = [1 1 .5 1 1 ].';
-% input.periodLength = periodLength/sum(periodLength)*(totalSimulationTime/60);
-% input.poissonPeriodIntensities = [0.55 0.70 0.10 0.40 0.10].'; % 24 / minute
-% tic
-% for k=1:NUMBER_OF_SOLUTIONS
-%     output = createSimulation(input);
-%     dlmwrite(...
-%         sprintf('output/train_req_rapide_%03d_450_24',k),...
-%         output.','delimiter',' ','precision',10)
-% end
-% for k=1:NUMBER_OF_SOLUTIONS
-%     output = createSimulation(input);
-%     dlmwrite(...
-%         sprintf('output/test_req_rapide_%03d_450_24',k),...
-%         output.','delimiter',' ','precision',10)
-% end
-% toc
 
 %% Other activity matrices to experiment with
 % A = ones(aw,ah); % uniform activity matrix.
