@@ -80,10 +80,10 @@ end
 % scenarioDescriptions{4} Long, hard set (7.5 hours, 33 requests / hour)
  relativePeriodLength = [1 1 .5 1 1 ].';
 % Period matrix for the short scenarios [minutes]
-    totalSimulationTime = 4*60*60; % Simulation length of 4 hours [seconds]
+    totalSimulationTime = 240*60; % Simulation length of 4 hours [seconds]
     shortPeriod = relativePeriodLength/sum(relativePeriodLength)*(totalSimulationTime/60);
 % Period matrix for the long scenarios [minutes]
-    totalSimulationTime = 7.5*60*60; % Simulation length of 7.5 hours [seconds]
+    totalSimulationTime = 450*60; % Simulation length of 7.5 hours [seconds]
     longPeriod = relativePeriodLength/sum(relativePeriodLength)*(totalSimulationTime/60);
 % Poisson intensity matrix for easy scenarios (24 requests / hour) [requests/minute]
     easyPoisson = [0.55 0.70 0.10 0.40 0.10].';
@@ -120,14 +120,14 @@ for k=1:4
        path = sprintf(...
            '%s/train_req_rapide_%03d_%s',...
            OUTPUT_FOLDER,n,scenarioDescriptions{k}.suffix);
-       dlmwrite(path, output.','delimiter',' ','precision',10);
+       dlmwrite(path, output.','delimiter',' ','precision',20);
    end
    for n=1:NUMBER_OF_SOLUTIONS(2,k)
        output = createSimulation(scenarioDescriptions{k});
        path = sprintf(...
            '%s/test_req_rapide_%03d_%s',...
            OUTPUT_FOLDER,n,scenarioDescriptions{k}.suffix);
-       dlmwrite(path, output.','delimiter',' ','precision',10);
+       dlmwrite(path, output.','delimiter',' ','precision',20);
    end
    toc
 end

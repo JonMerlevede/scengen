@@ -89,26 +89,28 @@ function [ output ] = createSimulation( I )
         assert(pos(2) < I.maxWidth);
         assert(pos(3) < I.maxHeight);
         assert(pos(4) < I.maxWidth);
-        pP = pos(1:2); % pickup point
-        dP = pos(3:4); % delivery point
+        Pp = pos(1:2); % pickup point
+        Pd = pos(3:4); % delivery point
         
         
         %% Determine windows
         % I DO KNOW WHAT THE CURRENT TIME IS. I THINK THIS IS THE REQUEST
         % ARRIVAL TIME.
         cT = requestArrivalTime; % current time
-        % Minimum travel time after delivery in seconds
-        mttDelivery = norm(dP - depotLocation)/speed;
-        % Minimum travel time between pickup and delivery in seconds
-        mttBetween = norm(dP - pP)/speed;
+        dij = norm(Pp - Pd);
+        dj0 = norm(Pd - depotLocation);
+        % Minimum travel time from pickup point to delivery point
+        tij = dij/speed;
+        % Minimum travel time from delivery point to depot
+        tj0 = dj0/speed;
         % Latest feasible time to start a delivery (really)
         % lftDelivery = totalSimulationTime - mttDelivery - I.deliveryDuration;
         % Latest feasible time to start a delivery (Gendreau)
-        lftDelivery = totalSimulationTime - mttDelivery;
+        lftDelivery = totalSimulationTime - tj0;
         % Latest feasible time to start a pickup (really)
         % lftPickup = lftDelivery - mttBetween - I.pickupDuration;
         % Latest feasible time to start a pickup (Gendreau)
-        lftPickup = totalSimulationTime - mttBetween - mttDelivery;
+        lftPickup = totalSimulationTime - tij - tj0;
 %         if cT > lftPickup
 %             if verbose
 %                 disp('Dismissing package: infeasible packet')
@@ -136,14 +138,16 @@ function [ output ] = createSimulation( I )
         remainingTime = max(totalSimulationTime - ptwBegin,0);
         remainingTimeFraction = I.pickupDeltas(1) + diff(I.pickupDeltas)*rand;
         ptwEnd = ptwBegin + remainingTime*remainingTimeFraction;
+        assert(ptwEnd > ptwBegin);
         % WHAT TO DO IN THIS CASE IS NOT SPECIFIED
         % I skip generation of these scenario's (the existing Gendreau
         % scenario's do not contain scenario's that match this case)
-        if (ptwEnd > lftPickup)
+        if (ptwBegin > lftPickup)
             if verbose
                 disp('Dismissing package: infeasible packet (pickup TW)')
             end
             continue; % call is not accepted
+            assert(false);
 %             pwtEnd = lftPickup;
         end
 
@@ -152,7 +156,7 @@ function [ output ] = createSimulation( I )
         % Earliest time we can start delivery (really)
         % earliestPossible = ptwBegin + I.pickupDuration + mttBetween;
         % Earliest time we can start delivery (by Gendreau)
-        earliestPossible = ptwBegin + mttBetween;
+        earliestPossible = ptwBegin + tij;
         % Determine halftime for delivery
         ht = (earliestPossible + lftDelivery) / 2;
         % Determine random delivery beta value
@@ -171,15 +175,17 @@ function [ output ] = createSimulation( I )
         remainingTime = max(totalSimulationTime - dtwBegin,0);
         remainingTimeFraction = I.deliveryDeltas(1) + diff(I.deliveryDeltas)*rand;
         dtwEnd = dtwBegin + remainingTime*remainingTimeFraction;
+        assert(dtwEnd > dtwBegin);
         % WHAT TO DO IN THIS CASE IS NOT SPECIFIED
         % I skip generation of these scenario's (the existing Gendreau
         % scenario's do not contain scenario's that match this case)
-        if (dtwEnd > lftDelivery)
+        if (dtwBegin > lftDelivery)
             if verbose
                 disp('Dismissing package: infeasible packet (delivery TW)')
             end
 %             dwtEnd = lftDelivery;
             continue; % call is not accepted
+            assert(false);
         end
 
         %% Discard calls
@@ -188,16 +194,20 @@ function [ output ] = createSimulation( I )
                 disp('Dismissing package: minimum separation not met');
             end
             continue;
+            assert(false);
         end
+        
+        assert(lftPickup >= ptwBegin);
+        assert(lftDelivery >= dtwBegin);
 
         %% Write delivery information to output matrix
         nValidRequests = nValidRequests + 1;
         output(:,nValidRequests) = [requestArrivalTime
             I.pickupDuration
-            pP(1) ; pP(2)
+            Pp(1) ; Pp(2)
             ptwBegin ; ptwEnd
             I.deliveryDuration
-            dP(1) ; dP(2)
+            Pd(1) ; Pd(2)
             dtwBegin ; dtwEnd];
     end
     % Reduce size of output matrix
