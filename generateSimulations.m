@@ -1,8 +1,10 @@
 % Number of solution to generate in each category
 % (:,1) - short/easy, (:,2) - short/hard, (:,3) - long/easy, (:,4) - long/hard.
 % (1,:) - training scenarios - (2,:) - test scenarios
-NUMBER_OF_SOLUTIONS = [100 100 100 0
-    50 50 50 0];
+NUMBER_OF_SOLUTIONS = [60 60 60 0
+    0 0 0 0];
+%NUMBER_OF_SOLUTIONS = [1000 1000 1000 0
+%    500 500 500 0];
 OUTPUT_FOLDER = 'output';
 
 %% Goal

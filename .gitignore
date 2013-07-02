@@ -3,3 +3,8 @@ output/*
 *.asv
 html
 *.db
+html
+matlab2tikz
+img
+*.eps
+*.pdf_tex

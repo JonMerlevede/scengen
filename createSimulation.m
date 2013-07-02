@@ -54,16 +54,17 @@ function [ output ] = createSimulation( I )
     
     %% Determine number of (possible) packets
     % Preallocate for speed (three times average length required)
-    requestPeriods = zeros(round(sum(I.poissonPeriodIntensities .* I.periodLength)) * 3,1);
+    requestPeriods = zeros(round(sum(I.poissonPeriodIntensities .* I.periodLength)) * 10,1);
     nRequests = 0;
     for l = 1:nPeriods
         % 'A Poisson law of intensity $$lambda^l$$ is applied to determine
         % the occurence of the next request => use the poisson intensities
         % to determine the number of requests in a time slot.
         nRequestsThisPeriod = poissrnd(I.poissonPeriodIntensities(l)*I.periodLength(l));
-        newNRequests = nRequests + nRequestsThisPeriod;
-        requestPeriods(nRequests + 1:newNRequests) = repmat(l,nRequestsThisPeriod,1);
-        nRequests = newNRequests;
+        %newNRequests = nRequests + nRequestsThisPeriod;
+        %requestPeriods(nRequests + 1:newNRequests) = repmat(l,nRequestsThisPeriod,1);
+        requestPeriods(nRequests + 1: nRequests + nRequestsThisPeriod) = l;
+        nRequests = nRequests + nRequestsThisPeriod;
     end
     requestPeriods = requestPeriods(1:nRequests);
     nValidRequests = 0;
@@ -76,6 +77,11 @@ function [ output ] = createSimulation( I )
         % Although not explicitly mentioned (?), we assume the request
         % arrival time to be uniformely distributed within its time slot.
         requestArrivalTime = periodStartTimes(period) + rand*I.periodLength(period);
+        if period ~= nPeriods
+            assert(requestArrivalTime <= periodStartTimes(period+1));
+        else
+            assert(requestArrivalTime <= totalSimulationTime/60);
+        end
         % Transform from [minutes] to [seconds]
         requestArrivalTime = requestArrivalTime*60;
         
@@ -111,12 +117,16 @@ function [ output ] = createSimulation( I )
         % lftPickup = lftDelivery - mttBetween - I.pickupDuration;
         % Latest feasible time to start a pickup (Gendreau)
         lftPickup = totalSimulationTime - tij - tj0;
-%         if cT > lftPickup
-%             if verbose
-%                 disp('Dismissing package: infeasible packet')
-%             end
-%             continue; % call is not accepted
-%         end
+        
+        % WHAT TO DO IN THIS CASE IS NOT SPECIFIED
+        % I skip generation of these scenario's (the existing Gendreau
+        % scenario's do not contain scenario's that match this case)
+        if cT > lftPickup
+            if verbose
+                disp('Dismissing package: infeasible packet')
+            end
+            continue; % call is not accepted
+        end
 
         %% Deterimine pickup time window
 
@@ -129,27 +139,36 @@ function [ output ] = createSimulation( I )
         else
             ptwBegin = ht + (lftPickup - ht)*rand;
         end
+        assert(ptwBegin <= lftPickup);
         % The end of the time window at the pick-up location is set to
         % the beginning of the time window + a fraction of the time
         % remaining until the end of the day.
         % Remaining time (actual)
         % remainingTime = lftPickup - (ptwBegin + I.pickupDuration);
-        % Remaining time (Gendreau) - I added the max here myself
+        % Remaining time (Gendreau)
+        %remainingTime = totalSimulationTime - cT;
         remainingTime = max(totalSimulationTime - ptwBegin,0);
         remainingTimeFraction = I.pickupDeltas(1) + diff(I.pickupDeltas)*rand;
         ptwEnd = ptwBegin + remainingTime*remainingTimeFraction;
+        % I added the min here myself
+        ptwEnd = min(ptwEnd,totalSimulationTime);
         assert(ptwEnd > ptwBegin);
-        % WHAT TO DO IN THIS CASE IS NOT SPECIFIED
-        % I skip generation of these scenario's (the existing Gendreau
-        % scenario's do not contain scenario's that match this case)
-        if (ptwBegin > lftPickup)
+        
+        if (ptwEnd < requestArrivalTime + I.minimumSeparation)
             if verbose
-                disp('Dismissing package: infeasible packet (pickup TW)')
+                disp('Dismissing package: minimum separation not met');
             end
-            continue; % call is not accepted
-            assert(false);
-%             pwtEnd = lftPickup;
+            continue;
         end
+        
+%         if (ptwBegin > lftPickup)
+%             if verbose
+%                 disp('Dismissing package: infeasible packet (pickup TW)')
+%             end
+%             continue; % call is not accepted
+%             assert(false);
+% %             pwtEnd = lftPickup;
+%         end
 
         %% Determine delivery time window
 
@@ -157,6 +176,7 @@ function [ output ] = createSimulation( I )
         % earliestPossible = ptwBegin + I.pickupDuration + mttBetween;
         % Earliest time we can start delivery (by Gendreau)
         earliestPossible = ptwBegin + tij;
+        assert(lftDelivery >= earliestPossible);
         % Determine halftime for delivery
         ht = (earliestPossible + lftDelivery) / 2;
         % Determine random delivery beta value
@@ -166,39 +186,31 @@ function [ output ] = createSimulation( I )
         else
             dtwBegin = ht + (lftDelivery - ht)*rand;
         end
+        assert(lftDelivery >= dtwBegin);
         % The end of the time window at the delivery location is set to
         % the beginning of the time window + a fraction of the time
         % remaining until the end of the day.
         % Remaining time (actual)
         % remainingTime = lftDelivery - (dtwBegin + I.deliveryDuration);
-        % Remaining time (Gendreau) - I added the max here myself
+        % Remaining time (Gendreau)
+        %remainingTime = totalSimulationTime - cT;
         remainingTime = max(totalSimulationTime - dtwBegin,0);
         remainingTimeFraction = I.deliveryDeltas(1) + diff(I.deliveryDeltas)*rand;
         dtwEnd = dtwBegin + remainingTime*remainingTimeFraction;
+        % I added the min here myself
+        dtwEnd = min(dtwEnd,totalSimulationTime);
         assert(dtwEnd > dtwBegin);
         % WHAT TO DO IN THIS CASE IS NOT SPECIFIED
         % I skip generation of these scenario's (the existing Gendreau
         % scenario's do not contain scenario's that match this case)
-        if (dtwBegin > lftDelivery)
-            if verbose
-                disp('Dismissing package: infeasible packet (delivery TW)')
-            end
-%             dwtEnd = lftDelivery;
-            continue; % call is not accepted
-            assert(false);
-        end
-
-        %% Discard calls
-        if (ptwEnd < requestArrivalTime + I.minimumSeparation)
-            if verbose
-                disp('Dismissing package: minimum separation not met');
-            end
-            continue;
-            assert(false);
-        end
-        
-        assert(lftPickup >= ptwBegin);
-        assert(lftDelivery >= dtwBegin);
+%         if (dtwBegin > lftDelivery)
+%             if verbose
+%                 disp('Dismissing package: infeasible packet (delivery TW)')
+%             end
+% %             dwtEnd = lftDelivery;
+%             continue; % call is not accepted
+%             assert(false);
+%         end
 
         %% Write delivery information to output matrix
         nValidRequests = nValidRequests + 1;
